@@ -75,11 +75,12 @@ class CollectionBackendInterface : public QObject {
   using AlbumList = QList<Album>;
 
   virtual QString songs_table() const = 0;
-  virtual QString fts_table() const = 0;
 
   virtual Song::Source source() const = 0;
 
   virtual Database *db() const = 0;
+
+  virtual void GetAllSongsAsync(const int id = 0) = 0;
 
   // Get a list of directories in the collection.  Emits DirectoriesDiscovered.
   virtual void LoadDirectoriesAsync() = 0;
@@ -134,7 +135,8 @@ class CollectionBackend : public CollectionBackendInterface {
 
   Q_INVOKABLE explicit CollectionBackend(QObject *parent = nullptr);
 
-  void Init(Database *db, TaskManager *task_manager, const Song::Source source, const QString &songs_table, const QString &fts_table, const QString &dirs_table = QString(), const QString &subdirs_table = QString());
+  void Init(Database *db, TaskManager *task_manager, const Song::Source source, const QString &songs_table, const QString &dirs_table = QString(), const QString &subdirs_table = QString());
+
   void Close();
 
   void ExitAsync();
@@ -146,9 +148,10 @@ class CollectionBackend : public CollectionBackendInterface {
   Database *db() const override { return db_; }
 
   QString songs_table() const override { return songs_table_; }
-  QString fts_table() const override { return fts_table_; }
   QString dirs_table() const { return dirs_table_; }
   QString subdirs_table() const { return subdirs_table_; }
+
+  void GetAllSongsAsync(const int id = 0) override;
 
   // Get a list of directories in the collection.  Emits DirectoriesDiscovered.
   void LoadDirectoriesAsync() override;
@@ -219,6 +222,7 @@ class CollectionBackend : public CollectionBackendInterface {
 
  public slots:
   void Exit();
+  void GetAllSongs(const int id);
   void LoadDirectories();
   void UpdateTotalSongCount();
   void UpdateTotalArtistCount();
@@ -253,6 +257,7 @@ class CollectionBackend : public CollectionBackendInterface {
   void DirectoryDiscovered(Directory, SubdirectoryList);
   void DirectoryDeleted(Directory);
 
+  void GotSongs(SongList, int);
   void SongsDiscovered(SongList);
   void SongsDeleted(SongList);
   void SongsStatisticsChanged(SongList);
@@ -297,7 +302,6 @@ class CollectionBackend : public CollectionBackendInterface {
   QString songs_table_;
   QString dirs_table_;
   QString subdirs_table_;
-  QString fts_table_;
   QThread *original_thread_;
 
 };
