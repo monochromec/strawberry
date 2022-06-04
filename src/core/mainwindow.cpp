@@ -173,6 +173,9 @@
 #  include "tidal/tidalservice.h"
 #  include "settings/tidalsettingspage.h"
 #endif
+#ifdef HAVE_SPOTIFY
+#  include "settings/spotifysettingspage.h"
+#endif
 #ifdef HAVE_QOBUZ
 #  include "settings/qobuzsettingspage.h"
 #endif
@@ -300,6 +303,9 @@ MainWindow::MainWindow(Application *app, std::shared_ptr<SystemTrayIcon> tray_ic
 #ifdef HAVE_TIDAL
       tidal_view_(new InternetTabsView(app_, app->internet_services()->ServiceBySource(Song::Source::Tidal), TidalSettingsPage::kSettingsGroup, SettingsDialog::Page::Tidal, this)),
 #endif
+#ifdef HAVE_SPOTIFY
+      spotify_view_(new InternetTabsView(app_, app->internet_services()->ServiceBySource(Song::Source::Spotify), SpotifySettingsPage::kSettingsGroup, SettingsDialog::Page::Spotify, this)),
+#endif
 #ifdef HAVE_QOBUZ
       qobuz_view_(new InternetTabsView(app_, app->internet_services()->ServiceBySource(Song::Source::Qobuz), QobuzSettingsPage::kSettingsGroup, SettingsDialog::Page::Qobuz, this)),
 #endif
@@ -381,6 +387,9 @@ MainWindow::MainWindow(Application *app, std::shared_ptr<SystemTrayIcon> tray_ic
 #endif
 #ifdef HAVE_TIDAL
   ui_->tabs->AddTab(tidal_view_, "tidal", IconLoader::Load("tidal", true, 0, 32), tr("Tidal"));
+#endif
+#ifdef HAVE_SPOTIFY
+  ui_->tabs->AddTab(spotify_view_, "spotify", IconLoader::Load("spotify"), tr("Spotify"));
 #endif
 #ifdef HAVE_QOBUZ
   ui_->tabs->AddTab(qobuz_view_, "qobuz", IconLoader::Load("qobuz", true, 0, 32), tr("Qobuz"));
@@ -712,6 +721,13 @@ MainWindow::MainWindow(Application *app, std::shared_ptr<SystemTrayIcon> tray_ic
   QObject::connect(qobuz_view_->albums_collection_view(), &InternetCollectionView::AddToPlaylistSignal, this, &MainWindow::AddToPlaylist);
   QObject::connect(qobuz_view_->songs_collection_view(), &InternetCollectionView::AddToPlaylistSignal, this, &MainWindow::AddToPlaylist);
   QObject::connect(qobuz_view_->search_view(), &InternetSearchView::AddToPlaylist, this, &MainWindow::AddToPlaylist);
+#endif
+
+#ifdef HAVE_SPOTIFY
+  QObject::connect(spotify_view_->artists_collection_view(), &InternetCollectionView::AddToPlaylistSignal, this, &MainWindow::AddToPlaylist);
+  QObject::connect(spotify_view_->albums_collection_view(), &InternetCollectionView::AddToPlaylistSignal, this, &MainWindow::AddToPlaylist);
+  QObject::connect(spotify_view_->songs_collection_view(), &InternetCollectionView::AddToPlaylistSignal, this, &MainWindow::AddToPlaylist);
+  QObject::connect(spotify_view_->search_view(), &InternetSearchView::AddToPlaylist, this, &MainWindow::AddToPlaylist);
 #endif
 
   QObject::connect(radio_view_, &RadioViewContainer::Refresh, app_->radio_services(), &RadioServices::RefreshChannels);
@@ -1142,6 +1158,18 @@ void MainWindow::ReloadSettings() {
   }
 #endif
 
+#ifdef HAVE_SPOTIFY
+  s.beginGroup(SpotifySettingsPage::kSettingsGroup);
+  bool enable_spotify = s.value("enabled", false).toBool();
+  s.endGroup();
+  if (enable_spotify) {
+    ui_->tabs->EnableTab(spotify_view_);
+  }
+  else {
+    ui_->tabs->DisableTab(spotify_view_);
+  }
+#endif
+
 #ifdef HAVE_QOBUZ
   s.beginGroup(QobuzSettingsPage::kSettingsGroup);
   bool enable_qobuz = s.value("enabled", false).toBool();
@@ -1188,6 +1216,9 @@ void MainWindow::ReloadAllSettings() {
 #endif
 #ifdef HAVE_TIDAL
   tidal_view_->ReloadSettings();
+#endif
+#ifdef HAVE_SPOTIFY
+  spotify_view_->ReloadSettings();
 #endif
 #ifdef HAVE_QOBUZ
   qobuz_view_->ReloadSettings();
@@ -3209,6 +3240,11 @@ void MainWindow::FocusSearchField() {
 #ifdef HAVE_TIDAL
   else if (ui_->tabs->currentIndex() == ui_->tabs->IndexOfTab(tidal_view_) && !tidal_view_->SearchFieldHasFocus()) {
     tidal_view_->FocusSearchField();
+  }
+#endif
+#ifdef HAVE_SPOTIFY
+  else if (ui_->tabs->currentIndex() == ui_->tabs->IndexOfTab(spotify_view_) && !spotify_view_->SearchFieldHasFocus()) {
+    spotify_view_->FocusSearchField();
   }
 #endif
 #ifdef HAVE_QOBUZ
