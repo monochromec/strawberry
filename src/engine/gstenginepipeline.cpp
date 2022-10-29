@@ -1326,6 +1326,7 @@ GstState GstEnginePipeline::state() const {
 }
 
 QFuture<GstStateChangeReturn> GstEnginePipeline::SetState(const GstState state) {
+  qLog(Debug) << __PRETTY_FUNCTION__ << state;
   return QtConcurrent::run(&set_state_threadpool_, &gst_element_set_state, pipeline_, state);
 }
 

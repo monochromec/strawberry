@@ -235,20 +235,102 @@ bool GstEngine::Play(const quint64 offset_nanosec) {
 
   if (!current_pipeline_ || current_pipeline_->is_buffering()) return false;
 
-  QFuture<GstStateChangeReturn> future = current_pipeline_->SetState(GST_STATE_PLAYING);
-  QFutureWatcher<GstStateChangeReturn> *watcher = new QFutureWatcher<GstStateChangeReturn>();
-  int pipeline_id = current_pipeline_->id();
-  QObject::connect(watcher, &QFutureWatcher<GstStateChangeReturn>::finished, this, [this, watcher, offset_nanosec, pipeline_id]() {
-    PlayDone(watcher->result(), offset_nanosec, pipeline_id);
-    watcher->deleteLater();
-  });
-  watcher->setFuture(future);
-
-  if (is_fading_out_to_pause_) {
-    current_pipeline_->SetState(GST_STATE_PAUSED);
+  if (current_pipeline_->state() == GST_STATE_PAUSED) {
+    return SetPlay(offset_nanosec);
   }
 
+  return PauseBeforePlay(offset_nanosec);
+
+}
+
+bool GstEngine::PauseBeforePlay(const quint64 offset_nanosec) {
+
+  EnsureInitialized();
+
+  QFutureWatcher<GstStateChangeReturn> *watcher = new QFutureWatcher<GstStateChangeReturn>();
+  const int pipeline_id = current_pipeline_->id();
+  QObject::connect(watcher, &QFutureWatcher<GstStateChangeReturn>::finished, this, [this, watcher, pipeline_id, offset_nanosec]() {
+    const GstStateChangeReturn ret = watcher->result();
+    watcher->deleteLater();
+    PauseBeforePlayFinished(pipeline_id, offset_nanosec, ret);
+  });
+  QFuture<GstStateChangeReturn> future = current_pipeline_->SetState(GST_STATE_PAUSED);
+  watcher->setFuture(future);
+
   return true;
+
+}
+
+bool GstEngine::SetPlay(const quint64 offset_nanosec) {
+
+  EnsureInitialized();
+
+  if (beginning_nanosec_ != 0 && offset_nanosec != 0) {
+    Seek(offset_nanosec);
+  }
+
+  QFutureWatcher<GstStateChangeReturn> *watcher = new QFutureWatcher<GstStateChangeReturn>();
+  const int pipeline_id = current_pipeline_->id();
+  QObject::connect(watcher, &QFutureWatcher<GstStateChangeReturn>::finished, this, [this, watcher, pipeline_id, offset_nanosec]() {
+    const GstStateChangeReturn ret = watcher->result();
+    watcher->deleteLater();
+    SetPlayFinished(pipeline_id, offset_nanosec, ret);
+  });
+  QFuture<GstStateChangeReturn> future = current_pipeline_->SetState(GST_STATE_PLAYING);
+  watcher->setFuture(future);
+
+  return true;
+
+}
+
+void GstEngine::PauseBeforePlayFinished(const int pipeline_id, const quint64 offset_nanosec, const GstStateChangeReturn ret) {
+
+  if (!current_pipeline_ || pipeline_id != current_pipeline_->id()) {
+    return;
+  }
+
+  if (ret == GST_STATE_CHANGE_FAILURE) {
+    PlayError(offset_nanosec);
+    return;
+  }
+
+  SetPlay(offset_nanosec);
+
+}
+
+void GstEngine::SetPlayFinished(const int pipeline_id, const quint64 offset_nanosec, const GstStateChangeReturn ret) {
+
+  if (!current_pipeline_ || pipeline_id != current_pipeline_->id()) {
+    return;
+  }
+
+  if (ret == GST_STATE_CHANGE_FAILURE) {
+    PlayError(offset_nanosec);
+    return;
+  }
+
+  StartTimers();
+
+  emit StateChanged(Engine::Playing);
+  emit ValidSongRequested(stream_url_);
+
+}
+
+void GstEngine::PlayError(const quint64 offset_nanosec) {
+
+  // Failure, but we got a redirection URL - try loading that instead
+  QByteArray redirect_url = current_pipeline_->redirect_url();
+  if (!redirect_url.isEmpty() && redirect_url != current_pipeline_->stream_url()) {
+    qLog(Info) << "Redirecting to" << redirect_url;
+    current_pipeline_ = CreatePipeline(redirect_url, current_pipeline_->original_url(), end_nanosec_);
+    Play(offset_nanosec);
+    return;
+  }
+
+  // Failure - give up
+  qLog(Warning) << "Could not set thread to PLAYING.";
+  current_pipeline_.reset();
+  BufferingFinished();
 
 }
 
@@ -256,8 +338,8 @@ void GstEngine::Stop(const bool stop_after) {
 
   StopTimers();
 
-  stream_url_ = QUrl();  // To ensure we return Empty from state()
-  original_url_ = QUrl();
+  stream_url_.clear();  // To ensure we return Empty from state()
+  original_url_.clear();
   beginning_nanosec_ = end_nanosec_ = 0;
 
   // Check if we started a fade out. If it isn't finished yet and the user pressed stop, we cancel the fader and just stop the playback.
@@ -337,6 +419,7 @@ void GstEngine::Seek(const quint64 offset_nanosec) {
     SeekNow();
     seek_timer_->start();  // Stop us from seeking again for a little while
   }
+
 }
 
 void GstEngine::SetVolumeSW(const uint percent) {
@@ -617,42 +700,6 @@ void GstEngine::SeekNow() {
   if (!current_pipeline_->Seek(static_cast<qint64>(seek_pos_))) {
     qLog(Warning) << "Seek failed";
   }
-
-}
-
-void GstEngine::PlayDone(const GstStateChangeReturn ret, const quint64 offset_nanosec, const int pipeline_id) {
-
-  if (!current_pipeline_ || pipeline_id != current_pipeline_->id()) {
-    return;
-  }
-
-  if (ret == GST_STATE_CHANGE_FAILURE) {
-    // Failure, but we got a redirection URL - try loading that instead
-    QByteArray redirect_url = current_pipeline_->redirect_url();
-    if (!redirect_url.isEmpty() && redirect_url != current_pipeline_->stream_url()) {
-      qLog(Info) << "Redirecting to" << redirect_url;
-      current_pipeline_ = CreatePipeline(redirect_url, current_pipeline_->original_url(), end_nanosec_);
-      Play(offset_nanosec);
-      return;
-    }
-
-    // Failure - give up
-    qLog(Warning) << "Could not set thread to PLAYING.";
-    current_pipeline_.reset();
-    BufferingFinished();
-    return;
-  }
-
-  StartTimers();
-
-  // Initial offset
-  if (offset_nanosec != 0 || beginning_nanosec_ != 0) {
-    Seek(offset_nanosec);
-  }
-
-  emit StateChanged(Engine::Playing);
-  // We've successfully started playing a media stream with this url
-  emit ValidSongRequested(stream_url_);
 
 }
 

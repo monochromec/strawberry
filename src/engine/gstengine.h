@@ -112,6 +112,8 @@ class GstEngine : public Engine::Base, public GstBufferConsumer {
   void timerEvent(QTimerEvent *e) override;
 
  private slots:
+  void PauseBeforePlayFinished(const int pipeline_id, const quint64 offset_nanosec, const GstStateChangeReturn ret);
+  void SetPlayFinished(const int pipeline_id, const quint64 offset_nanosec, const GstStateChangeReturn ret);
   void EndOfStreamReached(const int pipeline_id, const bool has_next_track);
   void HandlePipelineError(const int pipeline_id, const int domain, const int error_code, const QString &message, const QString &debugstr);
   void NewMetaData(const int pipeline_id, const Engine::SimpleMetaBundle &bundle);
@@ -119,13 +121,17 @@ class GstEngine : public Engine::Base, public GstBufferConsumer {
   void FadeoutFinished();
   void FadeoutPauseFinished();
   void SeekNow();
-  void PlayDone(const GstStateChangeReturn ret, const quint64, const int);
 
   void BufferingStarted();
   void BufferingProgress(int percent);
   void BufferingFinished();
 
  private:
+  bool PauseBeforePlay(const quint64 offset_nanosec);
+  bool SeekBeforePlay(const quint64 offset_nanosec);
+  bool SetPlay(const quint64 offset_nanosec);
+  void PlayError(const quint64 offset_nanosec);
+
   PluginDetailsList GetPluginList(const QString &classname) const;
   QByteArray FixupUrl(const QUrl &url);
 
