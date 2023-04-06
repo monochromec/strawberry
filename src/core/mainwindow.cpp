@@ -3074,11 +3074,11 @@ void MainWindow::AlbumCoverLoaded(const Song &song, AlbumCoverLoaderResultPtr re
   song_ = song;
   if (result) {
     album_cover_ = result->album_cover;
-    emit AlbumCoverReady(song, result->album_cover->image);
+    emit AlbumCoverReady(song, result->album_cover);
   }
   else {
     album_cover_.reset();
-    emit AlbumCoverReady(song, QImage());
+    emit AlbumCoverReady(song, AlbumCoverImageResultPtr());
   }
 
   const bool enable_change_art = song.is_collection_song() && !song.effective_albumartist().isEmpty() && !song.album().isEmpty();

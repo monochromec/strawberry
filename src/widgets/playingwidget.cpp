@@ -42,6 +42,7 @@
 #include "core/application.h"
 #include "utilities/imageutils.h"
 #include "covermanager/albumcoverchoicecontroller.h"
+#include "covermanager/albumcoverimageresult.h"
 #include "playingwidget.h"
 
 const char *PlayingWidget::kSettingsGroup = "PlayingWidget";
@@ -286,16 +287,22 @@ void PlayingWidget::SongChanged(const Song &song) {
 
 }
 
-void PlayingWidget::AlbumCoverLoaded(const Song &song, const QImage &image) {
+void PlayingWidget::AlbumCoverLoaded(const Song &song, AlbumCoverImageResultPtr result) {
 
-  if (!playing_ || song != song_playing_ || image == image_current_) return;
+  if (!playing_ || song != song_playing_ || (result && result->image == image_current_)) return;
 
   active_ = true;
   downloading_covers_ = false;
   song_ = song;
-  image_current_ = image;
 
-  SetImage(image);
+  if (result) {
+    image_current_ = result->image;
+    SetImage(result->image);
+  }
+  else {
+    image_current_ = QImage();
+    SetImage();
+  }
 
 }
 

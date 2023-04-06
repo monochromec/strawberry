@@ -36,6 +36,7 @@
 
 #include "core/song.h"
 #include "covermanager/albumcoverloaderoptions.h"
+#include "covermanager/albumcoverimageresult.h"
 
 class QTimeLine;
 class QTextDocument;
@@ -76,7 +77,7 @@ class PlayingWidget : public QWidget {
   void Error();
   void SongChanged(const Song &song);
   void SearchCoverInProgress();
-  void AlbumCoverLoaded(const Song &song, const QImage &image);
+  void AlbumCoverLoaded(const Song &song, AlbumCoverImageResultPtr result);
 
  protected:
   void paintEvent(QPaintEvent *e) override;
@@ -144,7 +145,7 @@ class PlayingWidget : public QWidget {
   void CreateModeAction(const Mode mode, const QString &text, QActionGroup *group);
   void UpdateDetailsText();
   void UpdateHeight();
-  void SetImage(const QImage &image);
+  void SetImage(const QImage &image = QImage());
   void DrawContents(QPainter *p);
   void ScaleCover();
   void GetCoverAutomatically();

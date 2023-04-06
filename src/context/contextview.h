@@ -31,6 +31,7 @@
 #include <QAction>
 
 #include "core/song.h"
+#include "covermanager/albumcoverimageresult.h"
 #include "contextalbum.h"
 
 class QMenu;
@@ -99,7 +100,7 @@ class ContextView : public QWidget {
   void Stopped();
   void Error();
   void SongChanged(const Song &song);
-  void AlbumCoverLoaded(const Song &song, const QImage &image);
+  void AlbumCoverLoaded(const Song &song, AlbumCoverImageResultPtr result);
 
  private:
   static const int kWidgetSpacing;

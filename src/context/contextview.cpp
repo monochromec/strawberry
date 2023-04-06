@@ -63,6 +63,7 @@
 #include "collection/collectionbackend.h"
 #include "collection/collectionquery.h"
 #include "collection/collectionview.h"
+#include "covermanager/albumcoverimageresult.h"
 #include "covermanager/albumcoverchoicecontroller.h"
 #include "lyrics/lyricsfetcher.h"
 #include "settings/contextsettingspage.h"
@@ -726,12 +727,18 @@ void ContextView::dropEvent(QDropEvent *e) {
 
 }
 
-void ContextView::AlbumCoverLoaded(const Song &song, const QImage &image) {
+void ContextView::AlbumCoverLoaded(const Song &song, AlbumCoverImageResultPtr result) {
 
-  if (song != song_playing_ || image == image_original_) return;
+  if (song != song_playing_ || (result && result->image == image_original_)) return;
 
-  widget_album_->SetImage(image);
-  image_original_ = image;
+  if (result) {
+    widget_album_->SetImage(result->image);
+    image_original_ = result->image;
+  }
+  else {
+    widget_album_->SetImage();
+    image_original_ = QImage();
+  }
 
 }
 
